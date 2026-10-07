@@ -1,4 +1,4 @@
-import { IsString, IsOptional,} from 'class-validator'
+import { IsString, IsOptional, IsArray, IsNotEmpty} from 'class-validator'
 import {PartialType} from '@nestjs/mapped-types'
 
 
@@ -17,11 +17,9 @@ export class TaskDto{
     description: string;
 
     @IsOptional()
-    @IsString()
-    comment:string;
-    
-   
-
+    @IsArray()
+    @IsString({ each: true })
+    comment: string[];
 }
 
 export class CreateTaskDto{
@@ -34,5 +32,11 @@ export class CreateTaskDto{
 }
 
 export class UpdateProductDto extends PartialType(TaskDto){
-    
+
+}
+
+export class AddCommentDto{
+    @IsString()
+    @IsNotEmpty()
+    text: string;
 }

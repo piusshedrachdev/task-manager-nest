@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { DbService } from '../db/db.service.js';
 import {Return} from '../utils/interface/interface.js'
 import { CreateTaskDto, TaskDto, UpdateProductDto } from './dto/task.dto.js';
@@ -16,21 +17,39 @@ export class TasksService {
 
     async getAllTasks(){
        await this.fetchTasks()
-       return this.memTasks 
+       return this.memTasks
     }
 
     async getTaskById(id:string){
         await this.fetchTasks()
-        return this.memTasks.find(task => task.id === id)
+        const task = this.memTasks.find(task => task.id === id)
+        if(!task) throw new NotFoundException(`Task with id "${id}" not found`)
+        return task
+    }
+
+    async getComments(id:string){
+        const task = await this.getTaskById(id)
+        return task.comment
+    }
+
+    async addComment(id:string, text:string){
+        await this.fetchTasks()
+        const index = this.memTasks.findIndex(t => t.id === id)
+        if(index === -1) throw new NotFoundException(`Task with id "${id}" not found`)
+
+        const comments = [...(this.memTasks[index].comment ?? []), text]
+        this.memTasks[index] = {...this.memTasks[index], comment: comments}
+        await this.saveTasks(this.memTasks)
+        return comments
     }
 
     async createTask(task:CreateTaskDto){
         await this.fetchTasks()
         const newTask:TaskDto = {
-            id: Date.now().toString(),
             status: "pending",
-            comment:"",
-            ...task
+            comment:[],
+            ...task,
+            id: randomUUID()
         }
         this.memTasks.push(newTask)
         await this.saveTasks(this.memTasks)
@@ -40,19 +59,19 @@ export class TasksService {
     async updateTask(task:UpdateProductDto){
         await this.fetchTasks()
         const index = this.memTasks.findIndex(t => t.id === task.id)
-        if(index !== -1){
-            this.memTasks[index] = {...this.memTasks[index], ...task}
-            await this.saveTasks(this.memTasks)
-        }
+        if(index === -1) throw new NotFoundException(`Task with id "${task.id}" not found`)
+        this.memTasks[index] = {...this.memTasks[index], ...task}
+        await this.saveTasks(this.memTasks)
+        return this.memTasks[index]
     }
 
     async deleteTask(id:string){
         await this.fetchTasks()
         const index = this.memTasks.findIndex(t => t.id === id)
-        if(index !== -1){
-            this.memTasks.splice(index, 1)
-            await this.saveTasks(this.memTasks)
-        }
+        if(index === -1) throw new NotFoundException(`Task with id "${id}" not found`)
+        this.memTasks.splice(index, 1)
+        await this.saveTasks(this.memTasks)
+        return { id, deleted: true }
     }
 
     private async saveTasks(_tasks:TaskDto[]):Promise<any>{
@@ -65,6 +84,13 @@ export class TasksService {
         }
     }
 
+    // Migrates legacy rows: `comment` used to be a string, it is now string[].
+    private migrateComment(raw:any):string[]{
+        if(Array.isArray(raw)) return raw
+        if(typeof raw === 'string' && raw.length > 0) return [raw]
+        return []
+    }
+
     private async fetchTasks(): Promise<Return<TaskDto[]>>{
         if(this.loaded) return {success:true, data: this.memTasks}
 
@@ -74,9 +100,9 @@ export class TasksService {
         {
             try{
                 const parsedTasks:TaskDto[] = JSON.parse(response.data)
-                this.memTasks = parsedTasks
+                this.memTasks = parsedTasks.map(t => ({...t, comment: this.migrateComment(t.comment)}))
                 this.loaded = true
-                return {success:true, data:parsedTasks}
+                return {success:true, data:this.memTasks}
             }catch(error){
                 return {success:false, error:error}
             }
