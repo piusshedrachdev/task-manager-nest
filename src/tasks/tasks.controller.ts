@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Delete, Put, Body } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Put, Body, Param } from '@nestjs/common';
 import {TasksService } from './tasks.service.js'
 import { HttpCode, HttpStatus } from '@nestjs/common';
+import { CreateTaskDto, UpdateProductDto } from './dto/task.dto.js';
 
 @Controller('tasks')
 export class TasksController {
@@ -10,26 +11,26 @@ export class TasksController {
     @HttpCode(HttpStatus.OK)
     @Get()
     getAllTasks(){
-        return //this.service.getAllTasks();
+        return this.service.getAllTasks();
     }
 
-    @Get()
-    getTaskById(@Body('id') id:string){
-        return //this.service.getTaskById(id);
+    @Get(':id')
+    getTaskById(@Param('id') id:string){
+        return this.service.getTaskById(id);
     }
 
     @Post()
-    createTask(@Body() task:any){
-        return //this.service.createTask(task);
+    createTask(@Body() task:CreateTaskDto){
+        return this.service.createTask(task);
     }
 
-    @Put()
-    updateTask(@Body() task:any){
-        return //this.service.updateTask(task);
+    @Put(':id')
+    updateTask(@Param('id') id:string, @Body() task:UpdateProductDto){
+        return this.service.updateTask({...task, id});
     }
 
-    @Delete()
-    deleteTask(@Body('id') id:string){
-        return //this.service.deleteTask(id);
+    @Delete(':id')
+    deleteTask(@Param('id') id:string){
+        return this.service.deleteTask(id);
     }
 }
