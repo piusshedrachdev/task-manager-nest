@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsArray, IsNotEmpty} from 'class-validator'
+import { IsString, IsOptional, IsArray, IsNotEmpty, IsEnum} from 'class-validator'
 import {PartialType} from '@nestjs/mapped-types'
+import { TaskStatus } from '../../utils/interface/interface.js'
 
 
 export class TaskDto{
@@ -9,8 +10,8 @@ export class TaskDto{
     @IsString()
     title: string;
 
-    @IsString()
-    status: string;
+    @IsEnum(TaskStatus)
+    status: TaskStatus;
 
     @IsOptional()
     @IsString()
@@ -39,4 +40,9 @@ export class AddCommentDto{
     @IsString()
     @IsNotEmpty()
     text: string;
+}
+
+export class UpdateStatusDto{
+    @IsEnum(TaskStatus)
+    status: TaskStatus;
 }

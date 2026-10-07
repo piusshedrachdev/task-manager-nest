@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Delete, Put, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Put, Patch, Body, Param } from '@nestjs/common';
 import {TasksService } from './tasks.service.js'
 import { HttpCode, HttpStatus } from '@nestjs/common';
-import { CreateTaskDto, UpdateProductDto, AddCommentDto } from './dto/task.dto.js';
+import { CreateTaskDto, UpdateProductDto, AddCommentDto, UpdateStatusDto } from './dto/task.dto.js';
 
 @Controller('tasks')
 export class TasksController {
@@ -27,6 +27,12 @@ export class TasksController {
     @Post(':id/comments')
     addComment(@Param('id') id:string, @Body() body:AddCommentDto){
         return this.service.addComment(id, body.text);
+    }
+
+    @Patch(':id/status')
+    @HttpCode(HttpStatus.OK)
+    updateStatus(@Param('id') id:string, @Body() body:UpdateStatusDto){
+        return this.service.updateStatus(id, body.status);
     }
 
     @Post()

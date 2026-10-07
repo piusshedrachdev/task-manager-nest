@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DbService } from '../db/db.service.js';
-import {Return} from '../utils/interface/interface.js'
+import {Return, TaskStatus} from '../utils/interface/interface.js'
 import { CreateTaskDto, TaskDto, UpdateProductDto } from './dto/task.dto.js';
 import {ConfigService} from '@nestjs/config'
 
@@ -43,10 +43,20 @@ export class TasksService {
         return comments
     }
 
+    async updateStatus(id:string, status:TaskStatus){
+        await this.fetchTasks()
+        const index = this.memTasks.findIndex(t => t.id === id)
+        if(index === -1) throw new NotFoundException(`Task with id "${id}" not found`)
+
+        this.memTasks[index] = {...this.memTasks[index], status}
+        await this.saveTasks(this.memTasks)
+        return this.memTasks[index]
+    }
+
     async createTask(task:CreateTaskDto){
         await this.fetchTasks()
         const newTask:TaskDto = {
-            status: "pending",
+            status: TaskStatus.TODO,
             comment:[],
             ...task,
             id: randomUUID()
@@ -84,13 +94,6 @@ export class TasksService {
         }
     }
 
-    // Migrates legacy rows: `comment` used to be a string, it is now string[].
-    private migrateComment(raw:any):string[]{
-        if(Array.isArray(raw)) return raw
-        if(typeof raw === 'string' && raw.length > 0) return [raw]
-        return []
-    }
-
     private async fetchTasks(): Promise<Return<TaskDto[]>>{
         if(this.loaded) return {success:true, data: this.memTasks}
 
@@ -100,7 +103,7 @@ export class TasksService {
         {
             try{
                 const parsedTasks:TaskDto[] = JSON.parse(response.data)
-                this.memTasks = parsedTasks.map(t => ({...t, comment: this.migrateComment(t.comment)}))
+                this.memTasks = parsedTasks
                 this.loaded = true
                 return {success:true, data:this.memTasks}
             }catch(error){
