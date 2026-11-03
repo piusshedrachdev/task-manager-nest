@@ -1,48 +1,107 @@
-import { IsString, IsOptional, IsArray, IsNotEmpty, IsEnum} from 'class-validator'
-import {PartialType} from '@nestjs/mapped-types'
-import { TaskStatus } from '../../utils/interface/interface.js'
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsNotEmpty,
+  IsEnum,
+  IsNumber,
+} from 'class-validator';
 
+import {
+  PartialType,
+  OmitType,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 
-export class TaskDto{
-    @IsString()
-    id:string;
+import { TaskStatus } from '../../utils/interface/interface.js';
 
-    @IsString()
-    title: string;
+export class TaskDto {
+  @ApiProperty({
+    example: '1',
+    description: 'Task ID',
+  })
+  @IsString()
+  id: string;
 
-    @IsEnum(TaskStatus)
-    status: TaskStatus;
+  @ApiProperty({
+    example: 'Complete NestJS assignment',
+    description: 'Title of the task',
+  })
+  @IsString()
+  title: string;
 
-    @IsOptional()
-    @IsString()
-    description: string;
+  @ApiProperty({
+    enum: TaskStatus,
+    example: TaskStatus.TODO,
+    description: 'Current status of the task',
+  })
+  @IsEnum(TaskStatus)
+  status: TaskStatus;
 
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    comment: string[];
+  @ApiPropertyOptional({
+    example: 'Implement authentication and Swagger documentation',
+    description: 'Detailed description of the task',
+  })
+  @IsOptional()
+  @IsString()
+  description: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['Started working on authentication', 'Swagger documentation completed'],
+    description: 'Comments associated with the task',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  comment: string[];
 }
 
-export class CreateTaskDto{
-    @IsString()
-    title:string;
+export class CreateTaskDto {
+  @ApiProperty({
+    example: 'Complete NestJS assignment',
+    description: 'Title of the task',
+  })
+  @IsString()
+  title: string;
 
-    @IsString()
-    @IsOptional()
-    description:string;
+  @ApiPropertyOptional({
+    example: 'Implement JWT authentication and Swagger documentation',
+    description: 'Description of the task',
+  })
+  @IsString()
+  @IsOptional()
+  description: string;
+
+  @ApiProperty({
+    example: 1,
+    description: 'ID of the project this task belongs to',
+  })
+  @IsNumber()
+  projectId: number;
 }
 
-export class UpdateProductDto extends PartialType(TaskDto){
+export class UpdateTaskDto extends PartialType(
+  OmitType(TaskDto, ['id'] as const),
+) {}
 
+export class AddCommentDto {
+  @ApiProperty({
+    example: 'Completed the authentication implementation',
+    description: 'Comment to add to the task',
+  })
+  @IsString()
+  @IsNotEmpty()
+  text: string;
 }
 
-export class AddCommentDto{
-    @IsString()
-    @IsNotEmpty()
-    text: string;
-}
-
-export class UpdateStatusDto{
-    @IsEnum(TaskStatus)
-    status: TaskStatus;
+export class UpdateStatusDto {
+  @ApiProperty({
+    enum: TaskStatus,
+    example: TaskStatus.DOING,
+    description: 'New status of the task',
+  })
+  @IsEnum(TaskStatus)
+  status: TaskStatus;
 }

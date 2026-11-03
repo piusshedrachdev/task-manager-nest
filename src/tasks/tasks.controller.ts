@@ -1,52 +1,47 @@
-import { Controller, Get, Post, Delete, Put, Patch, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Put, Patch, Body, Param, UseGuards, Req } from '@nestjs/common';
 import {TasksService } from './tasks.service.js'
 import { HttpCode, HttpStatus } from '@nestjs/common';
-import { CreateTaskDto, UpdateProductDto, AddCommentDto, UpdateStatusDto } from './dto/task.dto.js';
+import { CreateTaskDto, UpdateTaskDto } from './dto/task.dto.js';
+import { AuthGuard } from '../auth/auth.guard.js';
+import type {AuthenticatedRequest} from '../utils/interface/interface.js';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @Controller('tasks')
+@UseGuards(AuthGuard)
+@ApiBearerAuth()
 export class TasksController {
 
     constructor(private readonly service:TasksService){}
 
     @HttpCode(HttpStatus.OK)
     @Get()
-    getAllTasks(){
-        return this.service.getAllTasks();
+    @ApiOperation({ summary: 'Get all tasks for the authenticated user' })
+    getAllTasks(@Req() req:AuthenticatedRequest){
+        return this.service.getAllTasks(req.user?.id);
     }
 
     @Get(':id')
-    getTaskById(@Param('id') id:string){
-        return this.service.getTaskById(id);
+    @ApiOperation({ summary: 'Get a task by id' })
+    getTaskById(@Req() req:AuthenticatedRequest, @Param('id') id:number){
+        return this.service.getTaskById(req.user?.id, id);
     }
 
-    @Get(':id/comments')
-    getComments(@Param('id') id:string){
-        return this.service.getComments(id);
-    }
-
-    @Post(':id/comments')
-    addComment(@Param('id') id:string, @Body() body:AddCommentDto){
-        return this.service.addComment(id, body.text);
-    }
-
-    @Patch(':id/status')
-    @HttpCode(HttpStatus.OK)
-    updateStatus(@Param('id') id:string, @Body() body:UpdateStatusDto){
-        return this.service.updateStatus(id, body.status);
-    }
 
     @Post()
-    createTask(@Body() task:CreateTaskDto){
-        return this.service.createTask(task);
+    @ApiOperation({ summary: 'Create a new task' })
+    createTask(@Req() req:AuthenticatedRequest, @Body() task:CreateTaskDto){
+        return this.service.createTask(req, task);
     }
 
-    @Put(':id')
-    updateTask(@Param('id') id:string, @Body() task:UpdateProductDto){
-        return this.service.updateTask({...task, id});
+    @Patch(':id')
+    @ApiOperation({ summary: 'Update a task' })
+    updateTask(@Req() req:AuthenticatedRequest, @Param('id') id:number, @Body() task:UpdateTaskDto){
+        return this.service.updateTask(req.user?.id, id, task);
     }
 
     @Delete(':id')
-    deleteTask(@Param('id') id:string){
-        return this.service.deleteTask(id);
+    @ApiOperation({ summary: 'Delete a task' })
+    deleteTask(@Req() req:AuthenticatedRequest, @Param('id') id:number){
+        return this.service.deleteTask(req.user?.id, id);
     }
 }
