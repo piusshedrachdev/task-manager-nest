@@ -1,3 +1,7 @@
+import { JwtPayload } from 'jsonwebtoken';
+import { Request } from 'express';
+
+
 export interface Return<DR>{
     success:boolean,
     error?:unknown,
@@ -5,7 +9,11 @@ export interface Return<DR>{
 }
 
 export enum TaskStatus{
-    TODO = "TODO",
-    DOING = "DOING",
-    DONE = "DONE"
+    TODO = "todo",
+    DOING = "in_progress",
+    DONE = "completed"
+}
+
+export interface AuthenticatedRequest extends Request {
+  user?: JwtPayload;
 }

@@ -1,0 +1,752 @@
+{
+  "info": {
+    "_postman_id": "b3f5d0c2-5b1e-4f0a-9d7c-6a2e8f4c1d90",
+    "name": "Task Manager API",
+    "description": "Week 8 collection for the Task Manager API. Run the requests in order: Register generates a unique email, Login stores the JWT in the `token` collection variable, then the project and task requests reuse the stored ids. Swagger is served at {{baseUrl}}/api and the OpenAPI document is in docs/openapi.json.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "App",
+      "item": [
+        {
+          "name": "Health check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns Hello World!', () => pm.expect(pm.response.text()).to.eql('Hello World!'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": []
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Unauthenticated health check."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('userEmail', pm.variables.replaceIn('{{$randomEmail}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 201', () => pm.response.to.have.status(201));",
+                  "pm.test('returns a message', () => pm.expect(pm.response.json().message).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "register"]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Creates an account. The pre-request script generates a unique email so the request can be re-run."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "const token = pm.response.text().trim();",
+                  "pm.collectionVariables.set('token', token);",
+                  "pm.test('returns a JWT', () => pm.expect(token.split('.')).to.have.lengthOf(3));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "login"]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Returns the signed JWT as plain text and stores it in the `token` collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Get profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns the authenticated user', () => pm.expect(body.email).to.eql(pm.collectionVariables.get('userEmail')));",
+                  "pm.test('never returns the password', () => pm.expect(body).to.not.have.property('password'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            },
+            "description": "Returns the profile of the bearer token's user."
+          },
+          "response": []
+        },
+        {
+          "name": "Change user role (admin only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('is handled by the API', () => pm.expect([200, 403, 404]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{targetUserId}}/role",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{targetUserId}}", "role"]
+            },
+            "description": "Promotes a user to admin. Requires a token whose role is `admin`; a normal user receives 403 FORBIDDEN."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "Create project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('projectId', body.id);",
+                  "pm.test('trims the title', () => pm.expect(body.title).to.eql('Week 8 project'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"  Week 8 project  \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects"]
+            },
+            "description": "Creates a project owned by the authenticated user and stores its id."
+          },
+          "response": []
+        },
+        {
+          "name": "List projects",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects"]
+            },
+            "description": "Lists the authenticated user's projects with their tasks."
+          },
+          "response": []
+        },
+        {
+          "name": "Get project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns the stored project', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('projectId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects", "{{projectId}}"]
+            },
+            "description": "Returns one project owned by the caller."
+          },
+          "response": []
+        },
+        {
+          "name": "Update project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('applies the new title', () => pm.expect(pm.response.json().title).to.eql('Week 8 project (updated)'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Week 8 project (updated)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects", "{{projectId}}"]
+            },
+            "description": "Updates a project owned by the caller."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('reports the deletion', () => pm.expect(pm.response.json().deleted).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects", "{{projectId}}"]
+            },
+            "description": "Deletes a project owned by the caller. Run it after the task requests."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Create task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('taskId', body.id);",
+                  "pm.test('defaults to the todo status', () => pm.expect(body.status).to.eql('todo'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Document the API\",\n  \"description\": \"Publish Swagger and the Postman collection\",\n  \"projectId\": {{projectId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks"]
+            },
+            "description": "Creates a task inside a project owned by the caller and stores its id."
+          },
+          "response": []
+        },
+        {
+          "name": "List tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks"]
+            },
+            "description": "Lists tasks that belong to the caller's projects."
+          },
+          "response": []
+        },
+        {
+          "name": "Get task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns the stored task', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('taskId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "{{taskId}}"]
+            },
+            "description": "Returns one task owned by the caller."
+          },
+          "response": []
+        },
+        {
+          "name": "Update task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('applies the new status', () => pm.expect(pm.response.json().status).to.eql('completed'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "{{taskId}}"]
+            },
+            "description": "Partially updates a task; the status enum is validated."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('reports the deletion', () => pm.expect(pm.response.json().deleted).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "{{taskId}}"]
+            },
+            "description": "Deletes a task owned by the caller."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Errors",
+      "item": [
+        {
+          "name": "Validation error (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 400', () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test('uses the standard envelope', () => {",
+                  "  pm.expect(body).to.include({ success: false, statusCode: 400, code: 'VALIDATION_ERROR', message: 'Validation failed' });",
+                  "  pm.expect(body.details).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"A\",\n  \"email\": \"not-an-email\",\n  \"password\": \"weak\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "register"]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Shows the structured validation response for an invalid email and weak password."
+          },
+          "response": []
+        },
+        {
+          "name": "Duplicate resource (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 409', () => pm.response.to.have.status(409));",
+                  "pm.test('returns DUPLICATE_RESOURCE', () => pm.expect(pm.response.json().code).to.eql('DUPLICATE_RESOURCE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Duplicate User\",\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "register"]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Registers the email created by the Register request again."
+          },
+          "response": []
+        },
+        {
+          "name": "Unauthorized (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 401', () => pm.response.to.have.status(401));",
+                  "pm.test('uses the standard envelope', () => pm.expect(pm.response.json()).to.include({ success: false, statusCode: 401, code: 'UNAUTHORIZED' }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Calls a protected route without a token."
+          },
+          "response": []
+        },
+        {
+          "name": "Not found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 404', () => pm.response.to.have.status(404));",
+                  "pm.test('returns NOT_FOUND', () => pm.expect(pm.response.json().code).to.eql('NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/999999",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "999999"]
+            },
+            "description": "Reads a task id that does not belong to the caller."
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid id parameter (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 400', () => pm.response.to.have.status(400));",
+                  "pm.test('returns VALIDATION_ERROR', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_ERROR'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/not-a-number",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects", "not-a-number"]
+            },
+            "description": "Shows route parameter validation rejecting a non-numeric id."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userPassword",
+      "value": "Password123",
+      "type": "string"
+    },
+    {
+      "key": "projectId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "targetUserId",
+      "value": "1",
+      "type": "string"
+    }
+  ]
+}

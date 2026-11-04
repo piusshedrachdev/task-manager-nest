@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+
 import { TasksController } from './tasks.controller.js';
 import { TasksService } from './tasks.service.js';
+import { AuthGuard } from '../auth/auth.guard.js';
 
 describe('TasksController', () => {
   let controller: TasksController;
@@ -20,7 +22,10 @@ describe('TasksController', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<TasksController>(TasksController);
   });
