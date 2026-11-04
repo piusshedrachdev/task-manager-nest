@@ -1,97 +1,109 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateTaskDto, UpdateTaskDto } from './dto/task.dto.js';
-import {ConfigService} from '@nestjs/config'
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
+import { CreateTaskDto, UpdateTaskDto } from './dto/task.dto.js';
 import { Task } from './entities/task.entity.js';
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Projects } from '../projects/entity/project.entity.js';
+import { ResourceNotFoundException } from '../common/errors/app.exception.js';
 
 import type { AuthenticatedRequest } from '../utils/interface/interface.js';
 
 @Injectable()
 export class TasksService {
-    constructor(
-        private configService:ConfigService,
+  constructor(
+    @InjectRepository(Task)
+    private readonly taskRepository: Repository<Task>,
 
-        @InjectRepository(Task)
-        private readonly taskRepository: Repository<Task>
-    
-    ){
-        //this.TASK_FILE_NAME = this.configService.get<string>("TASK_FILE_NAME") ?? "tasks.json"
+    @InjectRepository(Projects)
+    private readonly projectRepository: Repository<Projects>,
+  ) {}
+
+  async getAllTasks(uid?: number) {
+    const userId = this.requireUserId(uid);
+
+    return this.taskRepository.find({
+      where: {
+        project: {
+          user: {
+            id: userId,
+          },
+        },
+      },
+    });
+  }
+
+  async getTaskById(uid: number | undefined, id: number) {
+    const userId = this.requireUserId(uid);
+
+    const task = await this.taskRepository.findOneBy({
+      id,
+      project: {
+        user: {
+          id: userId,
+        },
+      },
+    });
+
+    if (!task) {
+      throw new ResourceNotFoundException('Task', id);
     }
 
-    async getAllTasks(uid:number){
-        const tasks = await this.taskRepository.find({ 
-            where: {
-                project: {
-                    user: {
-                        id: uid,
-                    },
-                },
-            }
-        });
-        return tasks;
+    return task;
+  }
+
+  async createTask(req: AuthenticatedRequest, task: CreateTaskDto) {
+    const userId = this.requireUserId(req.user?.id);
+
+    const project = await this.projectRepository.findOne({
+      where: {
+        id: task.projectId,
+        user: {
+          id: userId,
+        },
+      },
+    });
+
+    if (!project) {
+      throw new ResourceNotFoundException('Project', task.projectId);
     }
 
-    async getTaskById(uid:number, id:number){
+    const newTask = this.taskRepository.create({
+      title: task.title,
+      description: task.description,
+      project: {
+        id: task.projectId,
+      },
+    });
 
-        const task = await this.taskRepository.findOneBy({
-            id, 
-            project: {
-                user: {
-                    id: uid,
-                },
-            },
-        })
+    return this.taskRepository.save(newTask);
+  }
 
-        if(!task){
-            throw new NotFoundException(`Task with id "${id}" not found`)
-        }
+  async updateTask(
+    uid: number | undefined,
+    id: number,
+    taskDto: UpdateTaskDto,
+  ) {
+    const task = await this.getTaskById(uid, id);
 
-        return task
+    this.taskRepository.merge(task, taskDto);
+
+    return this.taskRepository.save(task);
+  }
+
+  async deleteTask(uid: number | undefined, id: number) {
+    await this.getTaskById(uid, id);
+
+    await this.taskRepository.delete({ id });
+
+    return { id, deleted: true };
+  }
+
+  private requireUserId(uid?: number): number {
+    if (typeof uid !== 'number') {
+      throw new UnauthorizedException('Invalid token payload');
     }
 
-    async createTask(req: AuthenticatedRequest, task: CreateTaskDto){
-
-        const tasks = this.taskRepository.create({
-            title: task.title,
-            description: task.description,
-            project: {
-                id: task.projectId
-            }
-        })
-
-        return await this.taskRepository.save(tasks)
-    }
-
-    async updateTask(uid:number, id:number, taskDto:UpdateTaskDto){
-
-        const result  = await this.taskRepository.update(
-            { id: id, project: { user: { id: uid } } },
-            taskDto
-        )
-        
-        if (result.affected === 0) {
-            throw new NotFoundException(`Task ${id} not found`);
-        }
-
-        return this.taskRepository.findOneBy({ id });    
-    }
-
-    async deleteTask(uid:number, id:number){
-
-        const result  = await this.taskRepository.delete({ 
-            id, 
-            project: {
-                    user: {
-                        id: uid,
-                    },
-                },
-         })
-        
-        if (result.affected === 0) {
-            throw new NotFoundException(`Task ${id} not found`);
-        }
-
-    }
+    return uid;
+  }
 }

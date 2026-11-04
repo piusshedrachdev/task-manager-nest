@@ -2,12 +2,14 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  Index,
   OneToMany
 } from 'typeorm';
 
 import {Projects} from '../../projects/entity/project.entity.js'
 
 @Entity()
+@Index('UQ_users_email', ['email'], { unique: true })
 export class Users{
     @PrimaryGeneratedColumn()
     id:number;

@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto.js';
 import { Projects } from './entity/project.entity.js';
+import { ResourceNotFoundException } from '../common/errors/app.exception.js';
 
 @Injectable()
 export class ProjectsService {
@@ -26,7 +27,7 @@ export class ProjectsService {
         });
 
         if (!project) {
-            throw new NotFoundException(`Project with id "${id}" not found`);
+            throw new ResourceNotFoundException('Project', id);
         }
 
         return project;
@@ -52,11 +53,9 @@ export class ProjectsService {
     }
 
     async deleteProject(uid:number, id: number) {
-        const result = await this.projectRepository.delete({ id, user: { id: uid } });
+        await this.getProjectById(uid, id);
 
-        if (!result.affected) {
-            throw new NotFoundException(`Project ${id} not found`);
-        }
+        await this.projectRepository.delete({ id });
 
         return { id, deleted: true };
     }

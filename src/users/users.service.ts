@@ -1,77 +1,104 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Users } from './entities/users.entity.js';
 import { Repository } from 'typeorm';
 import { CreateUserDto, LoginDto, UserIdentityDto } from './dto/users.dto.js';
 import { createJWT } from '../utils/auth.js';
+import {
+  DuplicateResourceException,
+  InvalidCredentialsException,
+  ResourceNotFoundException,
+} from '../common/errors/app.exception.js';
 
-import {hash, compare} from 'bcrypt';
-
+import { hash, compare } from 'bcrypt';
 
 @Injectable()
 export class UsersService {
+  constructor(
+    @InjectRepository(Users)
+    private readonly usersRepository: Repository<Users>,
+    private readonly configService: ConfigService,
+  ) {}
 
-    constructor(
-        @InjectRepository(Users)
-        private readonly usersRepository: Repository<Users>
-    ){}
+  async registerUser(createUserDto: CreateUserDto) {
+    const email = createUserDto.email.trim().toLowerCase();
 
+    const existingUser = await this.usersRepository.findOne({
+      where: { email },
+    });
 
-    async registerUser(createUserDto:CreateUserDto){
-        const _user = await hash(createUserDto.password, 10)
-        const user = this.usersRepository.create({...createUserDto, password: _user})
-        await this.usersRepository.save(user)
-
-        return {message: "Account Created Successfully."}
+    if (existingUser) {
+      throw new DuplicateResourceException(
+        'An account with this email already exists',
+      );
     }
 
+    const password = await hash(createUserDto.password, 10);
+    const user = this.usersRepository.create({
+      name: createUserDto.name.trim(),
+      email,
+      password,
+    });
 
-   async loginUser(loginCred: LoginDto) {
+    await this.usersRepository.save(user);
 
-        // Find user by email
-        const user = await this.usersRepository.findOne({
-            where: { email: loginCred.email }
-        });
+    return { message: 'Account created successfully.' };
+  }
 
-        if (!user) {
-            throw new UnauthorizedException("Invalid email or password");
-        }
+  async loginUser(loginCred: LoginDto) {
+    const email = loginCred.email.trim().toLowerCase();
 
-        // Compare password with stored hash
-        const isPasswordValid = await compare(
-            loginCred.password,
-            user.password
-        );
+    const user = await this.usersRepository.findOne({
+      where: { email },
+    });
 
-        if (!isPasswordValid) {
-            throw new UnauthorizedException("Invalid email or password");
-        }
-
-        const userIdentity: UserIdentityDto = {
-            id: user.id,
-            name: user.name,
-            role: user.role,
-            email: user.email
-        };
-
-        // Generate JWT
-        const jwt = createJWT(userIdentity);
-
-        return jwt;
+    if (!user) {
+      throw new InvalidCredentialsException();
     }
 
+    const isPasswordValid = await compare(loginCred.password, user.password);
 
-    // protected route for only admins
-    async changeUserRole(targetUserId:number){
-        await this.usersRepository.update(targetUserId, {role:'admin'})
+    if (!isPasswordValid) {
+      throw new InvalidCredentialsException();
     }
 
-    async getProfile(uid:number){
-        const user = await this.usersRepository.findOneBy({id:uid}) ?? {}
+    const userIdentity: UserIdentityDto = {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      email: user.email,
+    };
 
-        return Object.fromEntries(Object.entries(user).filter(([key]) => key !== 'password'));
+    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
 
+    return createJWT(userIdentity, secret);
+  }
 
+  async changeUserRole(targetUserId: number) {
+    const user = await this.usersRepository.findOneBy({ id: targetUserId });
+
+    if (!user) {
+      throw new ResourceNotFoundException('User', targetUserId);
     }
 
+    await this.usersRepository.update(targetUserId, { role: 'admin' });
+
+    return { id: targetUserId, role: 'admin' };
+  }
+
+  async getProfile(uid: number) {
+    const user = await this.usersRepository.findOneBy({ id: uid });
+
+    if (!user) {
+      throw new ResourceNotFoundException('User', uid);
+    }
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+  }
 }

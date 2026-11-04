@@ -1,33 +1,15 @@
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module.js';
 
-import {ValidationPipe} from '@nestjs/common';
-
-import {
-  SwaggerModule,
-  DocumentBuilder,
-} from '@nestjs/swagger';
-
+import { setupSwagger } from './common/swagger/swagger.config.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
 
-  app.useGlobalPipes(new ValidationPipe({
-    transform:true,
-    whitelist:true
-  }));
+  setupSwagger(app, configService);
 
-  const config = new DocumentBuilder()
-    .setTitle('Task Manager API')
-    .setDescription('API documentation for users, projects and tasks')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-
-  SwaggerModule.setup('api', app, document);
-  
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(Number(configService.get<string>('PORT') ?? 3000));
 }
 await bootstrap();

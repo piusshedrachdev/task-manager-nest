@@ -30,7 +30,7 @@ export class AuthGuard implements CanActivate {
 
       const decoded = jwt.verify(token, secret);
 
-      if (typeof decoded === 'string') {
+      if (typeof decoded === 'string' || typeof decoded.id !== 'number') {
         throw new UnauthorizedException('Invalid token payload');
       }
 
